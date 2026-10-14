@@ -12,7 +12,7 @@ different demographic groups. MinSum instead:
    **verification embedding** (ArcFace, AdaFace, MagFace, ElasticFace, TransFace,
    DFace or dlib);
 3. calibrates one threshold **per cluster** on the train pairs by minimising
-   `weight * FPR + FNR` (the minimum-sum objective), alongside a fixed global
+   `$\alpha$ * FPR + (1 - $\alpha$) * FNR` (the minimum-sum objective), alongside a fixed global
    threshold as a baseline;
 4. assigns validation images to the nearest cluster centroid and evaluates both
    threshold sets on validation pairs, overall, per cluster and per ethnicity.
