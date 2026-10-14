@@ -1,0 +1,140 @@
+# Full MinSum pipeline run: python -m minsum.run_full_pipeline --config <this file>
+#
+# Every value below is the current default of the step script it feeds, so a key
+# left out (or set to null) behaves exactly like running that script without the
+# option. Option names match the scripts' flags with "_" instead of "-".
+#
+# The runner wires the hand-off names between steps itself:
+#   clustering embedding_name  -> 03 --cluster-embedding -> 05 --cluster-embedding
+#   03 run name                -> 05 --cluster-run-name
+#   verification embedding_name -> 05 --verification-embedding
+
+run:
+  project_root: null          # REQUIRED; outputs are written under {project_root}/outputs
+  dataset_name: rfw
+  # Steps to run, always executed in pipeline order. Override with --steps.
+  steps:
+    - metadata                # 01
+    - clustering_embedding    # 02a / 02b
+    - clustering              # 03
+    - verification_embedding  # 04a-04g
+    - postprocessing          # 05
+  python: null                # interpreter for every step; null = the one running the runner
+
+# 01 run_01_build_metadata
+metadata:
+  dataset_root: null          # REQUIRED when the metadata step runs
+  parser: rfw                 # rfw | generic-folder
+  splits: [train, val]
+  split_by_identity: false
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  random_seed: 42
+
+# 02 clustering embeddings; only the selected extractor's block is used
+clustering_embedding:
+  extractor: fairface         # deepface (02a) | fairface (02b)
+  python: null                # optional interpreter override for this step
+  deepface:                   # 02a run_02a_extract_deepface_clustering
+    embedding_name: deepface_arcface
+    splits: [train, val]
+    model_name: ArcFace
+    detector_backend: skip
+    align: false
+    enforce_detection: false
+    normalization: base
+    checkpoint_every: 0
+  fairface:                   # 02b run_02b_extract_fairface_clustering
+    embedding_name: fairface_penultimate
+    weights_path: null        # REQUIRED when selected
+    device: null              # null = auto-detect
+    splits: [train, val]
+    checkpoint_every: 0
+
+# 03 run_03_fit_clusters
+clustering:
+  run_name: null              # null = k{n_clusters}_cosine_centroid_{no_pca|pca{pca_components}}
+  n_clusters: 30
+  random_state: 42
+  use_pca: false
+  pca_components: 64
+  kmeans_n_init: 10
+  kmeans_max_iter: 300
+
+# 04 verification embeddings; only the selected extractor's block is used
+verification_embedding:
+  extractor: arcface          # arcface | adaface | face_recognition | dface | magface | elasticface | transface
+  python: null                # optional interpreter override, e.g. a tensorflow<=2.12 env for dface
+  arcface:                    # 04a run_04a_extract_arcface_verification
+    embedding_name: arcface
+    splits: [train, val]
+    model_name: buffalo_l
+    ctx_id: 0
+    det_size: [640, 640]
+    mode: detect              # detect | prealigned
+    model_root: null          # null = ~/.insightface/models/{model_name}
+    recognition_model: w600k_r50.onnx
+    image_size: [112, 112]
+    checkpoint_every: 100
+  adaface:                    # 04b run_04b_extract_adaface_verification
+    embedding_name: adaface
+    weights_path: null        # REQUIRED when selected
+    architecture: ir_50       # ir_18 | ir_34 | ir_50 | ir_101 | ir_se_50 | ir_se_101
+    device: null
+    splits: [train, val]
+    checkpoint_every: 100
+  face_recognition:           # 04c run_04c_extract_face_recognition_verification
+    embedding_name: face_recognition_dlib
+    splits: [train, val]
+    mode: prealigned          # prealigned | detect
+    detector_model: hog       # hog | cnn
+    landmark_model: small     # small | large
+    num_jitters: 1
+    normalize: true           # false for canonical dlib euclidean distance
+    checkpoint_every: 100
+  dface:                      # 04d run_04d_extract_dface_verification
+    embedding_name: dface_deepface
+    splits: [train, val]
+    model_name: DeepFace
+    detector_backend: skip
+    normalization: base
+    align: false
+    enforce_detection: false
+    checkpoint_every: 100
+  magface:                    # 04e run_04e_extract_magface_verification
+    embedding_name: magface_iresnet50
+    weights_path: null        # REQUIRED when selected
+    architecture: iresnet50   # iresnet18 | iresnet34 | iresnet50 | iresnet100
+    device: null
+    l2_normalize: false
+    splits: [train, val]
+    checkpoint_every: 100
+  elasticface:                # 04f run_04f_extract_elasticface_verification
+    embedding_name: elasticface_iresnet100
+    weights_path: null        # REQUIRED when selected
+    architecture: iresnet100  # iresnet18 | iresnet34 | iresnet50 | iresnet100
+    device: null
+    splits: [train, val]
+    checkpoint_every: 100
+  transface:                  # 04g run_04g_extract_transface_verification
+    embedding_name: transface_vit_s
+    weights_path: null        # REQUIRED when selected
+    network: vit_s_dp005_mask_0  # vit_s_dp005_mask_0 | vit_b_dp005_mask_005 | vit_l_dp005_mask_005 | vit_s | vit_b
+    device: null
+    no_l2_normalize: false
+    splits: [train, val]
+    checkpoint_every: 100
+
+# 05 run_05_postprocessing: pairs, distances, threshold calibration, evaluation
+postprocessing:
+  random_seed: 42
+  allow_different_ethnicity: false
+  pairs_per_class: 1000
+  diff_constraint_cols: [ethnicity_id]
+  shared_val_pairs_path: null
+  fixed_threshold: 0.45
+  distance_metric: cosine     # cosine | euclidean (euclidean for raw dlib descriptors)
+  num_thresholds: 200
+  minimum_sum_fpr_weights: [1]
+  minimum_sum_tie_breaks: [median]  # median | lowest | highest

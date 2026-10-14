@@ -1,0 +1,62 @@
+[project]
+name = "minsum"
+version = "0.1.0"
+description = "Cluster-adaptive verification thresholds for reducing demographic bias in face recognition"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "joblib>=1.4",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3,<3",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.8.0",
+]
+
+[project.optional-dependencies]
+# 02a clustering embeddings and 04d DFace verification embeddings
+deepface = [
+    "deepface>=0.0.93",
+    "onnxruntime-gpu>=1.20; sys_platform == 'linux'",
+    "opencv-python>=4.10",
+    "tf-keras>=2.19",
+]
+# 02b FairFace, 04b AdaFace, 04e MagFace, 04f ElasticFace, 04g TransFace
+torch = [
+    "opencv-python>=4.10",
+    "pillow>=11.0",
+    "torch>=2.6",
+    "torchvision>=0.21",
+]
+# 04a ArcFace (InsightFace); builds from source, needs a C++ compiler
+insightface = [
+    "insightface>=0.7.3,<0.8",
+    "onnxruntime-gpu>=1.20; sys_platform == 'linux'",
+    "onnxruntime>=1.20; sys_platform != 'linux'",
+    "opencv-python>=4.10",
+]
+# 04c dlib face_recognition; dlib builds from source, needs cmake and a C++ compiler
+dlib = [
+    "dlib>=19.24",
+    "face-recognition-models>=0.3.0",
+    "pillow>=11.0",
+]
+all = [
+    "minsum[deepface,torch,insightface,dlib]",
+]
+
+[tool.uv]
+# deepface, retina-face and albumentations each pull a different OpenCV build
+# and CPU onnxruntime; all OpenCV builds ship the same cv2 module, and CPU and
+# GPU onnxruntime ship the same onnxruntime module, so keep exactly one of each.
+override-dependencies = [
+    "onnxruntime>=1.20; sys_platform != 'linux'",
+    "opencv-contrib-python-headless; sys_platform == 'never'",
+    "opencv-python-headless; sys_platform == 'never'",
+]
+
+[build-system]
+requires = ["uv_build>=0.8,<0.10"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
